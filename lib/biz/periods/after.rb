@@ -27,6 +27,10 @@ module Biz
         @intervals ||= schedule.intervals
       end
 
+      def shifts
+        @shifts ||= schedule.shifts
+      end
+
     end
   end
 end

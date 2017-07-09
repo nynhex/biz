@@ -21,9 +21,8 @@ module Biz
       private
 
       def periods
-        weeks
+        linear_periods
           .lazy
-          .flat_map { |week| business_periods(week) }
           .select   { |period| relevant?(period) }
           .map      { |period| period & boundary }
           .flat_map { |period| active_periods(period) }
@@ -31,8 +30,13 @@ module Biz
           .reject(&:empty?)
       end
 
-      def business_periods(week)
-        intervals.lazy.map { |interval| interval.to_time_segment(week) }
+      def linear_periods
+        Linear.new(
+          weeks.lazy.flat_map { |week|
+            intervals.map { |interval| WeekInterval.new(week, interval) }
+          },
+          shifts
+        )
       end
 
       def active_periods(period)

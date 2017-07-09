@@ -10,6 +10,13 @@ RSpec.describe Biz::Configuration do
     }
   }
 
+  let(:shifts) {
+    {
+      Date.new(2006, 1, 4) => {'10:00' => '14:00'},
+      Date.new(2006, 1, 5) => {'11:00' => '13:00', '14:00' => '16:00'}
+    }
+  }
+
   let(:breaks) {
     {
       Date.new(2006, 1, 2) => {'10:00' => '11:30'},
@@ -23,6 +30,7 @@ RSpec.describe Biz::Configuration do
   subject(:configuration) {
     Biz::Configuration.new do |config|
       config.hours     = hours
+      config.shifts    = shifts
       config.breaks    = breaks
       config.holidays  = holidays
       config.time_zone = time_zone
@@ -50,6 +58,10 @@ RSpec.describe Biz::Configuration do
 
     it 'configures the intervals' do
       expect(proc_configuration.intervals).to eq configuration.intervals
+    end
+
+    it 'configures the shifts' do
+      expect(proc_configuration.shifts).to eq configuration.shifts
     end
 
     it 'configures the holidays' do
@@ -141,6 +153,39 @@ RSpec.describe Biz::Configuration do
             TZInfo::Timezone.get('America/New_York')
           )
         ]
+      end
+    end
+  end
+
+  describe '#shifts' do
+    it 'returns the proper shifts' do
+      expect(configuration.shifts).to eq [
+        Biz::Shift.new(
+          Biz::TimeSegment.new(
+            in_zone(time_zone) { Time.new(2006, 1, 4, 10) },
+            in_zone(time_zone) { Time.new(2006, 1, 4, 14) }
+          )
+        ),
+        Biz::Shift.new(
+          Biz::TimeSegment.new(
+            in_zone(time_zone) { Time.new(2006, 1, 5, 11) },
+            in_zone(time_zone) { Time.new(2006, 1, 5, 13) }
+          )
+        ),
+        Biz::Shift.new(
+          Biz::TimeSegment.new(
+            in_zone(time_zone) { Time.new(2006, 1, 5, 14) },
+            in_zone(time_zone) { Time.new(2006, 1, 5, 16) }
+          )
+        )
+      ]
+    end
+
+    context 'when unconfigured' do
+      subject(:configuration) { Biz::Configuration.new do end }
+
+      it 'returns the default set of shifts' do
+        expect(configuration.shifts).to eq []
       end
     end
   end

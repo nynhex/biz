@@ -16,6 +16,7 @@ Time calculations using business hours.
   - Intervals spanning the entire day.
   - Holidays.
   - Breaks (time-segment holidays).
+  - Shifts (date-based intervals).
 * Second-level calculation precision.
 * Seamless Daylight Saving Time handling.
 * Schedule intersection.
@@ -52,6 +53,11 @@ Biz.configure do |config|
     sat: {'10:00' => '14:00'}
   }
 
+  config.shifts = {
+    Date.new(2006, 1, 1) => {'09:00' => '12:00'},
+    Date.new(2006, 1, 7) => {'08:00' => '10:00', '12:00' => '14:00'}
+  }
+
   config.breaks = {
     Date.new(2006, 1, 2) => {'10:00' => '11:30'},
     Date.new(2006, 1, 3) => {'14:15' => '14:30', '15:40' => '15:50'}
@@ -62,6 +68,10 @@ Biz.configure do |config|
   config.time_zone = 'America/Los_Angeles'
 end
 ```
+
+Shifts act as exceptions to the hours configured for a particular date. That
+is, if a date contains both hours-based intervals and shifts, the shifts are in
+force and the intervals are disregarded.
 
 Periods occurring on holidays are disregarded. Similarly, any segment of a
 period that overlaps with a break is treated as inactive.
@@ -194,6 +204,11 @@ schedule_1 = Biz::Schedule.new do |config|
     sat: {'11:00' => '14:30'}
   }
 
+  config.shifts = {
+    Date.new(2016, 7, 1) => {'10:00' => '13:00', '15:00' => '16:00'},
+    Date.new(2016, 7, 2) => {'14:00' => '17:00'}
+  }
+
   config.breaks = {
     Date.new(2016, 6, 2) => {'09:00' => '10:30', '16:00' => '16:30'},
     Date.new(2016, 6, 3) => {'12:15' => '12:45'}
@@ -211,6 +226,11 @@ schedule_2 = Biz::Schedule.new do |config|
     tue: {'11:00' => '15:00'},
     wed: {'16:00' => '18:00'},
     thu: {'11:00' => '12:00', '13:00' => '14:00'}
+  }
+
+  config.shifts = {
+    Date.new(2016, 7, 1) => {'15:30' => '16:30'},
+    Date.new(2016, 7, 5) => {'14:00' => '18:00'}
   }
 
   config.breaks = {
@@ -231,8 +251,8 @@ schedule_1 & schedule_2
 ```
 
 The resulting schedule will be a combination of the two schedules: an
-intersection of the intervals, a union of the breaks and holidays, and the time
-zone of the first schedule.
+intersection of the intervals and shifts, a union of the breaks and holidays,
+and the time zone of the first schedule.
 
 For the above example, the resulting schedule would be equivalent to one with
 the following configuration:
@@ -244,6 +264,11 @@ Biz::Schedule.new do |config|
     tue: {'11:00' => '15:00'},
     wed: {'16:00' => '17:00'},
     thu: {'11:00' => '12:00', '13:00' => '14:00'}
+  }
+
+  config.shifts = {
+    Date.new(2016, 7, 1) => {'15:30' => '16:00'},
+    Date.new(2016, 7, 5) => {'14:00' => '16:00'}
   }
 
   config.breaks = {

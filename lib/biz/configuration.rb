@@ -21,11 +21,25 @@ module Biz
       end
     end
 
+    def shifts
+      @shifts ||= begin
+        raw
+          .shifts
+          .flat_map { |date, hours|
+            hours.map { |timestamps| Shift.new(date_period(date, timestamps)) }
+          }
+          .sort
+          .freeze
+      end
+    end
+
     def breaks
       @breaks ||= begin
         raw
           .breaks
-          .flat_map { |date, hours| break_periods(date, hours) }
+          .flat_map { |date, hours|
+            hours.map { |timestamps| date_period(date, timestamps) }
+          }
           .sort
           .freeze
       end
@@ -54,6 +68,7 @@ module Biz
     def &(other)
       self.class.new do |config|
         config.hours     = Interval.to_hours(intersected_intervals(other))
+        config.shifts    = intersected_shifts(other)
         config.breaks    = combined_breaks(other)
         config.holidays  = [*raw.holidays, *other.raw.holidays].map(&:to_date)
         config.time_zone = raw.time_zone
@@ -69,6 +84,7 @@ module Biz
     def to_proc
       proc do |config|
         config.hours     = raw.hours
+        config.shifts    = raw.shifts
         config.breaks    = raw.breaks
         config.holidays  = raw.holidays
         config.time_zone = raw.time_zone
@@ -95,13 +111,11 @@ module Biz
       }
     end
 
-    def break_periods(date, hours)
-      hours.map { |start_timestamp, end_timestamp|
-        TimeSegment.new(
-          time.on_date(date, DayTime.from_timestamp(start_timestamp)),
-          time.on_date(date, DayTime.from_timestamp(end_timestamp))
-        )
-      }
+    def date_period(date, timestamps)
+      TimeSegment.new(
+        time.on_date(date, DayTime.from_timestamp(timestamps.first)),
+        time.on_date(date, DayTime.from_timestamp(timestamps.last))
+      )
     end
 
     def intersected_intervals(other)
@@ -113,6 +127,28 @@ module Biz
       }
     end
 
+    def intersected_shifts(other)
+      [
+        *intersected_comparable_shifts(shifts, other.shifts),
+        *intersected_comparable_shifts(other.shifts, shifts)
+      ]
+    end
+
+    def intersected_comparable_shifts(shifts1, shifts2)
+      [*shifts1, *comparable_intervals(shifts2)].flat_map { |shift|
+        shifts2.map { |other_shift| shift & other_shift }.reject(&:empty?)
+      }
+    end
+
+    def comparable_intervals(compared_shifts)
+      compared_shifts
+        .map { |shift| Week.from_date(shift.date) }
+        .uniq
+        .flat_map { |week|
+          intervals.map { |interval| interval.to_time_segment(week) }
+        }
+    end
+
     def combined_breaks(other)
       Hash.new do |config, date| config.store(date, {}) end.tap do |combined|
         [raw.breaks, other.raw.breaks].each do |configured|
@@ -121,7 +157,7 @@ module Biz
       end
     end
 
-    Raw = Struct.new(:hours, :breaks, :holidays, :time_zone) do
+    Raw = Struct.new(:hours, :shifts, :breaks, :holidays, :time_zone) do
       module Default
         HOURS = {
           mon: {'09:00' => '17:00'},
@@ -131,6 +167,7 @@ module Biz
           fri: {'09:00' => '17:00'}
         }.freeze
 
+        SHIFTS    = [].freeze
         BREAKS    = [].freeze
         HOLIDAYS  = [].freeze
         TIME_ZONE = 'Etc/UTC'.freeze
@@ -140,6 +177,7 @@ module Biz
         super
 
         self.hours     ||= Default::HOURS
+        self.shifts    ||= Default::SHIFTS
         self.breaks    ||= Default::BREAKS
         self.holidays  ||= Default::HOLIDAYS
         self.time_zone ||= Default::TIME_ZONE

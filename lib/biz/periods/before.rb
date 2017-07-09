@@ -30,6 +30,10 @@ module Biz
         @intervals ||= schedule.intervals.reverse
       end
 
+      def shifts
+        @shifts ||= schedule.shifts.reverse
+      end
+
     end
   end
 end

@@ -23,7 +23,7 @@ module Biz
                 :end_time,
                 :time_zone
 
-    delegate wday_symbol: :start_time
+    delegate %i[wday wday_symbol] => :start_time
 
     def endpoints
       [start_time, end_time]
